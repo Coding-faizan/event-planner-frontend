@@ -7,7 +7,12 @@ import { Event } from "@/types/event";
 
 export default function Home() {
   const [selected, setSelected] = useState<Event | null>(null);
-  const [refresh, setRefresh] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleSave = () => {
+    setSelected(null);
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -15,13 +20,10 @@ export default function Home() {
 
       <EventForm
         selected={selected}
-        onSave={() => {
-          setSelected(null);
-          setRefresh(!refresh);
-        }}
+        onSave={handleSave}
       />
 
-      <EventList onEdit={setSelected} refresh={refresh} />
+      <EventList onEdit={setSelected} refresh={refreshTrigger} selected={selected} />
     </div>
   );
 }

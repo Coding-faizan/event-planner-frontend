@@ -1,19 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Event, EVENT_CATEGORIES } from "@/types/event";
 
 
 export default function EventList({
   onEdit,
   refresh,
+  selected,
 }: {
   onEdit: (e: Event) => void;
-  refresh: boolean;
+  refresh: number;
+  selected: Event | null;
 }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [category, setCategory] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/events?category=${category}`);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      let data: Event[] = await res.json();
+      setEvents(data);
+    } catch (error) {
+      console.error('Failed to fetch events:', error);
+      setEvents([]);
+    }
+  }, [category]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -22,27 +38,30 @@ export default function EventList({
       setIsLoading(false);
     };
     fetchData();
-  }, [refresh, category]);
-
-  async function fetchEvents() {
-    const res = await fetch(`http://localhost:5000/api/events`,{method: "GET"});
-    let data: Event[] = await res.json();
-    if (category) {
-      data = data.filter((e) => e.category === category);
-    }
-    setEvents(data);
-  }
+  }, [refresh, fetchEvents]);
 
 
-  function handleFilter(category: string) {
-    setCategory(category === category ? "" : category);
+  function handleFilter(c: string) {
+    setCategory(c === category ? "" : c);
   }
 
   async function handleDelete(id?: string) {
     if (!id) return;
     if (!confirm("Delete this event?")) return;
-    await fetch(`http://localhost:5000/api/events/${id}`, { method: "DELETE" });
-    fetchEvents();
+    
+    try {
+      setIsLoading(true);
+      const res = await fetch(`http://localhost:5000/api/events/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      await fetchEvents();
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+      alert('Failed to delete event. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   if (isLoading) return <p>Loading...</p>;
@@ -80,14 +99,16 @@ export default function EventList({
             </div>
             <div className="flex gap-2">
               <button
-                className="w-14 h-12 px-1 bg-green-500 text-white rounded"
+                className="w-14 h-12 px-1 bg-green-500 text-white rounded disabled:opacity-50"
                 onClick={() => onEdit(event)}
+                disabled={isLoading || (!!selected && selected._id === event._id)}
               >
                 Edit
               </button>
               <button
-                className="w-14 h-12 px-1 bg-red-500 text-white rounded"
+                className="w-14 h-12 px-1 bg-red-500 text-white rounded disabled:opacity-50"
                 onClick={() => handleDelete(event._id)}
+                disabled={isLoading || (!!selected && selected._id === event._id)}
               >
                 Delete
               </button>

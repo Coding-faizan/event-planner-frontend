@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Event, EVENT_CATEGORIES } from "@/types/event";
+import { Event, EVENT_CATEGORIES, EventCategory } from "@/types/event";
+import { on } from "events";
 
+type FormData = {
+  title: string;
+  description: string;
+  date: string;
+  category: EventCategory;
+};
 
 export default function EventForm({
   selected,
@@ -11,7 +18,7 @@ export default function EventForm({
   selected: Event | null;
   onSave: () => void;
 }) {
-  const [form, setForm] = useState<Event>({
+  const [form, setForm] = useState<FormData>({
     title: "",
     description: "",
     date: "",
@@ -19,12 +26,25 @@ export default function EventForm({
   });
   const [isSubmitting,setIsSubmitting] = useState(false);
 
+  const resetForm = () => {
+    setForm({
+      title: "",
+      description: "",
+      date: "",
+      category: "work",
+    });
+  };
+
   useEffect(() => {
     if (selected) {
       setForm({
-        ...selected,
+        title: selected.title,
+        description: selected.description,
         date: selected.date.slice(0, 10), // fix for input[type=date]
+        category: selected.category,
       });
+    } else {
+      resetForm();
     }
   }, [selected]);
 
@@ -37,26 +57,36 @@ export default function EventForm({
 
     try {
       setIsSubmitting(true);
+      let res: Response;
+      
       if (selected?._id) {
-        await fetch(`http://localhost:5000/api/events/${selected._id}`, {
+        res = await fetch(`http://localhost:5000/api/events/${selected._id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         });
       } else {
-        await fetch("http://localhost:5000/api/events", {
+        res = await fetch("http://localhost:5000/api/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         });
       }
 
-      setForm({ title: "", description: "", date: "", category: "work" });
+      if (!res.ok) {
+        throw new Error(`Failed to ${selected ? 'update' : 'add'} event`);
+      }
+
+      const result = await res.json();
+      console.log('Event saved successfully:', result);
+      
+      // Reset form on success
+      resetForm();
       onSave();
     } catch (err) {
-      console.error(err);
-    }
-    finally{
+      console.error('Failed to save event:', err);
+      alert(`Failed to ${selected ? 'update' : 'add'} event. Please try again.`);
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -121,6 +151,17 @@ export default function EventForm({
       >
         {selected ? "Update Event" : "Add Event"}
       </button>
+      {selected &&
+        <button
+          type="button"
+          onClick={() => {
+            resetForm();
+            onSave();
+          }}
+          className="px-4 py-2 bg-gray-600 text-white rounded w-full mt-2 disabled:opacity-50"
+          disabled={isSubmitting}
+        > Cancel </button>
+      }
     </form>
   );
 }
